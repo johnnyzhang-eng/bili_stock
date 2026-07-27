@@ -1,0 +1,211 @@
+---
+# Attack Registry — Alpha Discovery Engine
+# Every methodology pitfall ever identified. Append-only. New hypotheses MUST
+# clear all entries before VALIDATE.
+# Schema: see ENGINE_SPEC.md §4.
+
+attacks:
+  - id: B1
+    name: "snapshot-based smart-cube selection (forward-look)"
+    discovered: 2026-05-23
+    discovered_by: codex
+    cycle: 001
+    severity: CRITICAL
+    description: |
+      Selecting a cube as "smart" using cumulative ann_gain through 2026,
+      then applying that list to backtest periods before 2026. The cube
+      identity itself is forward-selected on outcome.
+    test: |
+      Reconstruct rolling 12-month skill ex-ante per (cube, week). At
+      each signal date T, eligibility uses only data with created_at ≤ T.
+      Compare verdict under ex-ante vs snapshot — must give consistent
+      sign and order-of-magnitude alpha. If snapshot t-stat collapses
+      to <50% under ex-ante, the snapshot was load-bearing.
+    prevented_examples: []  # populate when future cycles catch this
+
+  - id: B2
+    name: "event timestamp backdating"
+    discovered: 2026-05-23
+    discovered_by: codex
+    cycle: 001
+    severity: CRITICAL
+    description: |
+      Event with created_at on Tuesday-Sunday of week W backdated to
+      Monday-of-W via `strftime('%Y-W%W')` + `-1` strptime suffix.
+      80.34% of events affected. Combined with same-week forward
+      return → potential entry-price leak for Friday-post-close events.
+    test: |
+      For any event-stamped signal, audit that signal_date >= max(event_ts)
+      in its bucket. Signal_date should equal first tradable day after
+      latest event in bucket. Replicate IC after timestamp shift; if
+      result inverts or collapses, original timestamp was wrong.
+
+  - id: B3-i
+    name: "rank-pct mask = all-non-NaN tie-effect"
+    discovered: 2026-05-23
+    discovered_by: claude
+    cycle: 001
+    severity: CRITICAL
+    description: |
+      `mask = f_row > 0` applied to a rank-pct frame evaluates to True
+      for every non-NaN cell (rank.pct gives ties at zero a small
+      positive value). IC then tests held-vs-not-held selection effect
+      across full universe, not rank skill within held cohort.
+    test: |
+      Replicate verdict IC. Then change mask to operate on RAW factor
+      (before rank). If IC magnitude drops >50%, original was selection
+      effect dressed as rank skill.
+
+  - id: B3-ii
+    name: "CB/STAR/北交所 universe contamination"
+    discovered: 2026-05-23
+    discovered_by: claude
+    cycle: 001
+    severity: MEDIUM
+    description: |
+      Signal panel included 587 CB (110/113/118/123/127/128) prefixes
+      not present in forward-return universe. Silent intersection drop
+      at IC alignment, but cross-sectional rank.pct already shifted by
+      these phantom rows.
+    test: |
+      Compute set difference between signal columns and fwd_ret columns
+      grouped by code prefix. If non-trivial overlap exists for code
+      classes that should not be in the strategy universe, contamination
+      present.
+
+  - id: B3-iii
+    name: "random-control not size/liq matched"
+    discovered: 2026-05-23
+    discovered_by: codex
+    cycle: 001
+    severity: MEDIUM
+    description: |
+      no_smart_random / random_control sampled from out-of-pool without
+      size/liquidity matching. Smart cubes concentrate in large/mid-cap;
+      out-of-pool skews to micro-cap. Apparent alpha may be small-cap beta.
+    test: |
+      Apply liquidity-decile + board match for random control. Codex's
+      ablation showed 2022+ avoid spread dropped from +10.97%/yr to
+      +5.66%/yr with liq+board match. Mcap match (pending point-in-time
+      panel) likely further reduces.
+
+  - id: B4
+    name: "row-shuffle random control with cross-shuffle std underestimation"
+    discovered: 2026-05-23
+    discovered_by: claude
+    cycle: 001
+    severity: MEDIUM
+    description: |
+      N=30 row shuffles of rank panel + std-across-shuffles divisor =>
+      cross-shuffle std << per-week IC std => t = mean / cross-shuffle-std
+      is mechanically inflated. Violates AUDIT_FINDINGS_2026_04_27 B2 fix
+      (n_random_repeats=1).
+    test: |
+      Use foundation.Backtest(random_control=True, n_random_repeats=1).
+      Compare resulting t to row-shuffle t; >2x ratio indicates inflation.
+
+  - id: B5-i
+    name: "delisted fwd_ret = 0 instead of NaN"
+    discovered: 2026-05-23
+    discovered_by: claude
+    cycle: 001
+    severity: CRITICAL
+    description: |
+      rerun_with_full_data.py used `df.loc[:wk_end].iloc[-1]` for stale
+      stocks, returning carried-forward last close indefinitely. Then
+      fwd_ret = same/same - 1 = 0. 430/5429 columns silently filled.
+      Random-control baseline anchored toward 0.
+    test: |
+      Audit forward_returns CSV: columns with last-non-NaN >= today
+      regardless of stock being delisted. Apply STALENESS_DAYS=14 gate.
+      If non-trivial fraction was 0-filled before fix, distortion present.
+
+  - id: B5-ii
+    name: "delisted stock OHLCV under-coverage"
+    discovered: 2026-04-27
+    discovered_by: foundation_audit
+    cycle: pre-engine
+    severity: MEDIUM
+    description: |
+      A-share 2015-2024 delistings ~150; daily_k cache has 27 pre-2022-only
+      codes. ~80% of true delistings missing. Systematic alpha inflation
+      1-3%/yr.
+    test: |
+      Quote against AUDIT_FINDINGS_2026_04_27.md. Apply 1-3%/yr discount
+      to annualized alpha until historical baostock delisted backfill is
+      implemented.
+
+  - id: B7
+    name: "CrossSectionalStrategy tie-order bias"
+    discovered: 2026-05-24
+    discovered_by: claude
+    cycle: 001
+    severity: MEDIUM
+    description: |
+      When factor_fn returns identical values for multiple stocks,
+      `sort_values()` in `CrossSectionalStrategy.select()` falls back to
+      DataFrame index/order from `Universe.at()`, which may carry hidden
+      size/code ordering bias. Surfaced when self_test NULL factor
+      (constant 0) gave t=+2.93 false positive.
+    test: |
+      For any factor_fn, ensure non-tied output. Apply deterministic
+      stable_jitter (hash(code, sig_date) % 10^9 / 10^9 * 1e-6) on any
+      tied segment.
+    mitigation_status: |
+      Mitigated locally in self_test.factor_null and PHASE_1_PLAN.md
+      factor_a1_avoid. **NOT mitigated at framework level** in
+      CrossSectionalStrategy.select(). Open TODO for foundation refactor.
+
+  - id: D1
+    name: "akshare panel includes non-baostock-covered codes"
+    discovered: 2026-05-24
+    discovered_by: claude
+    cycle: 001
+    severity: MEDIUM (data-layer)
+    description: |
+      akshare yjbb_em returns full A-share + 北交所 + B-shares + ETF
+      residuals (11,757 codes), but baostock OHLCV only covers SH/SZ
+      main + ChiNext + STAR (~5,500). DataBundle.load() audits coverage
+      against full panel → fails at 6.9% < 30%.
+    test: |
+      Pre-filter panel_quarterly.csv at fetch_fundamentals.py to prefixes
+      000/001/002/003/300/600/601/603/605/688. Coverage rises to
+      meaningful percent.
+    mitigation_status: |
+      FIXED upstream 2026-05-24 (commit ff680e4) in
+      research/factors_v2/fetch_fundamentals.py — post-build A-share prefix
+      filter with unfiltered backup saved as panel_quarterly_full.csv.
+      Future panel rebuilds will no longer trigger this attack.
+
+  - id: B8
+    name: "selection-axis instability (cohort rotation > 20%/Q)"
+    discovered: 2026-05-24
+    discovered_by: claude
+    cycle: 001
+    severity: CRITICAL (family-level)
+    description: |
+      When a hypothesis family shares a SELECTION AXIS (e.g., "smart cubes
+      defined by rolling 12M ann_gain in (25%, 200%]"), the axis itself
+      must be temporally stable for any per-cohort signal to generalize OOS.
+
+      Cycle 001 empirically validated: A1/H2/H3/H4 ALL died with Train/Test
+      alpha sign divergence despite addressing different hypotheses (static
+      holding, event-flow buy, event-flow exit, weighted intensity). The
+      shared death pattern came from the SHARED AXIS, not from per-hypothesis
+      issues.
+
+      Diagnostic: cubes rolling_ann_gain axis empirically shows median 33.7%
+      quarter-over-quarter cohort rotation. P75 51%. Max 100%. No signal
+      built on a cohort that turns over 1/3+ per quarter can have stable
+      OOS direction.
+    test: |
+      research/foundation/_engine/axis_stability_audit.py — gate_for_hypothesis()
+      raises AxisInstabilityBlock if median quarter-over-quarter cohort
+      rotation >= 20%. Cycle selection MUST call this before promoting any
+      hypothesis on a shared axis to RUNNING.
+    enforcement_status: |
+      ACTIVE 2026-05-24. Cycle 002 H5 must run on a behavioral axis (turnover
+      percentile / lag) which is conceptually NOT the rolling skill axis —
+      separate B8 audit on the new axis required before H5 runs. I-B1 转债
+      doesn't use a cube-based axis so B8 is N/A for it.
+---

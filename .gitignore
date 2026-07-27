@@ -1,0 +1,62 @@
+# Data
+# 数据目录 — 默认大文件忽略，small backtest data 允许
+data/stock_data/         # 5000 只股票 OHLCV，太大
+data/fundamentals/       # 季度基本面 panel
+data/cubes.db            # 雪球 55k 数据
+data/strategy_data.db    # 中间结果
+data/backtest_results.txt
+
+# Credentials — NEVER commit
+*.cookie
+**/.cookie
+.env.local
+secrets.yml
+# data/market_cache/ 不 ignore — 4 个 ETF cache (<200KB) 可 commit
+
+*.db
+*.csv
+*.json
+*.xlsx
+*.log
+logs/
+research/factors_v2/cache/
+
+# Config
+config.py
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+
+# IDE
+.vscode/
+.idea/
+.trae/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Archive
+archive/**/*.zip
+
+
+# 4 ETF cache + 拼接历史（<500 KB 总）— 让 clone 后能直接跑 30/30/40
+!data/market_cache/etf_*.csv
+!data/market_cache/hs300_daily_cache.csv
+!research/factors_v2/output/long_history*.csv
+
+# 逐年表现 CSV — 让 README 表格可复现
+!research/factors_v2/output/yearly_breakdown_30_30_40.csv
+
+# Cycle 002 H5 axis files — Codex needs these in his working tree for B8 audit
+!research/smart_consensus/output/H5_*.csv
+
+# Cycle 002 §2.5 I-B1 转债 cache — Codex needs this for verdict + audit
+!data/bonds_cb/**/*.csv

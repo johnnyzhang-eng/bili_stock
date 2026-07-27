@@ -1,0 +1,275 @@
+---
+# Hypothesis Registry — Alpha Discovery Engine
+# Schema: see ENGINE_SPEC.md §3
+# Append-only. Updates via committed diff. Status promotion rules in §3.
+
+hypotheses:
+  - id: A1
+    status: REJECTED
+    thesis: "smart cubes 重仓股下周跑输大盘 (contrarian)"
+    type: cross_sectional
+    cadence: weekly_signal_quarterly_backtest
+    proposer: johnny
+    proposed_date: 2025-08
+    cycle_first_seen: 001
+    cycle_verdict: 001
+    prior_pr_alpha: 0.25
+    attacks_resolved: [B1, B2, B3-i, B3-ii, B5-i, B7]
+    attacks_pending: [B3-iii, B5-ii]
+    verdict:
+      result: REJECT
+      alpha_per_period_pct: +0.15
+      t_stat: +0.12
+      n: 35
+      train_test_signs_disagree: true
+      kill_criteria_fired: ["§6.2 (Train/Test signs disagree)", "§6.4 (alpha ≈ 0)"]
+    artifact_links:
+      - research/smart_consensus/verdict_2026-05-23.md  # RETRACTED 2026-05-24
+      - research/smart_consensus/verdict_2026-05-24_foundation.md  # canonical replacement
+      - research/foundation/METHODOLOGY_AUDIT_2026-05-23.md
+      - research/foundation/IC_DELTA_2026-05-23.md
+      - research/smart_consensus/output/cycle001_foundation_reports.md
+
+  - id: H2
+    status: REJECTED
+    thesis: "≥3 smart cubes 同一周新建仓 → consensus formation → 下周跑赢"
+    type: event_driven
+    cadence: 5_trading_day_horizon
+    proposer: claude
+    proposed_date: 2026-05-24
+    cycle_first_seen: 001
+    cycle_verdict: 001
+    prior_pr_alpha: 0.25
+    owner: codex
+    verdict:
+      result: REJECT
+      alpha_per_period_pct: +0.90
+      t_stat: +0.71
+      n: 109
+      train_test_signs_disagree: true
+      kill_criteria_fired: ["§6.2 (Train/Test signs disagree)", "§6.4 (Full t < +1)"]
+
+  - id: H3
+    status: REJECTED
+    thesis: "≥3 smart cubes 同一周清仓 → insider info diffusion → 下周跑输 (avoid cohort)"
+    type: event_driven
+    cadence: 5_trading_day_horizon
+    proposer: claude
+    proposed_date: 2026-05-24
+    cycle_first_seen: 001
+    cycle_verdict: 001
+    prior_pr_alpha: 0.30
+    owner: claude
+    verdict:
+      result: REJECT
+      alpha_per_period_pct: +0.33
+      t_stat: +0.29
+      n: 111
+      train_test_signs_disagree: true
+      kill_criteria_fired: ["§6.2 (sign disagreement)", "wrong-sign for thesis (wanted negative, got positive)"]
+
+  - id: H4
+    status: REJECTED
+    thesis: "skill-weighted buy-intensity (新加仓量,过去30日) 横截面预测下季度收益"
+    type: cross_sectional
+    cadence: quarterly
+    proposer: claude
+    proposed_date: 2026-05-24
+    cycle_first_seen: 001
+    cycle_verdict: 001
+    prior_pr_alpha: 0.10
+    owner: claude
+    verdict:
+      result: REJECT
+      alpha_per_period_pct: -1.17
+      t_stat: -0.99
+      test_t_stat: -2.70
+      n: 35
+      kill_criteria_fired: ["§6.4 (Full alpha negative)", "Test t=-2.70 wrong-way for long-only thesis"]
+
+  # Slots for cycle 002+ proposals (placeholder; agents fill via commits)
+  - id: H7
+    status: PROPOSED
+    thesis: "smart cube portfolio concentration (Herfindahl) vs subsequent NAV — concentrated cubes either over-confident or skilled"
+    type: cross_sectional_meta
+    proposer: claude
+    proposed_date: 2026-05-24
+    cycle_first_seen: null
+    prior_pr_alpha: 0.10
+    notes: "Renamed from draft H5 to H7 by Codex on 2026-05-24 so H5 can uniquely refer to Behavioral Adverse Selection."
+    attacks_pending: [B5-ii, "meta-feature requires longer NAV history"]
+
+  - id: H6
+    status: PROPOSED
+    thesis: "dumb cubes (ann_gain < median, followers low) 重仓股 → 反向更可能 outperform"
+    type: cross_sectional
+    proposer: claude
+    proposed_date: 2026-05-24
+    cycle_first_seen: null
+    prior_pr_alpha: 0.20
+    notes: "dumb-money-as-anti-signal classical pattern; cubes data offers natural cross-section. NOTE: H6 still rides the skill axis (high vs low ann_gain). If cycle 001 kills the skill axis cleanly, H6 likely dies with it. Codex's H5 abandons skill axis entirely and is the higher-prior resurrection."
+    attacks_pending: [B1-equivalent, B3-iii]
+
+  - id: H5
+    status: REJECTED
+    thesis: "Behavioral Adverse Selection — 历史高换手/晚入场行为模式的 cubes,在某只股出现异常 attention (价格 + 成交量 spike) 后买入,该股下 N 日跑输严格 matched controls"
+    type: event_driven
+    cadence: 5_trading_day_horizon
+    proposer: codex
+    proposed_date: 2026-05-24
+    cycle_first_seen: 002    # Cycle 001 finishes skill-axis kill first; H5 opens behavior axis in 002
+    prior_pr_alpha: 0.30     # Codex prior; mine concurs
+    owner: codex             # he proposed; behavior-axis design is his domain
+    behavioral_axis: true    # marker: this hypothesis explicitly abandons skill axis
+    mechanism_focus: "late_trend_chasing_after_price_volume_exhaustion (primary); lagged_copycat (secondary)"
+    ex_ante_selector:
+      kind: "cube behavior pattern"
+      computable_from_history_only: true
+      candidate_features:
+        - "trailing 90-day turnover percentile of cube's portfolio"
+        - "median lag (trading days) between cube's new-buy on stock X and earliest-cube new-buy on same X in same cluster"
+        - "fraction of cube's buys occurring within 5 days of stock's 2σ+ return"
+        - "portfolio concentration trend (Herfindahl) — increasing concentration = chasing"
+    matched_control_required:
+      - same_signal_date
+      - same_board (sh_main/sz_main/chinext/star)
+      - same_liquidity_decile (20d-avg amount)
+      - same_size_decile (point-in-time mcap from panel_quarterly)
+      - same_20d_momentum_decile (price return [T-21, T-1])
+      - industry_match: true   # claude proposed; sector rotation confounds
+    attacks_pending: [B7, B3-iii (already addressed if matched control is implemented), "selector look-ahead audit", "ex-ante turnover percentile computation must use trailing window only"]
+    open_design_questions:
+      - "2σ threshold vs top-decile percentile for 'abnormal attention' — robustness to fat tails"
+      - "matched control: must we include industry, or does board+liq+size+momentum suffice?"
+      - "selector axis: turnover percentile alone, or composite of features above?"
+    notes: |
+      Codex's framing (from _sync/codex_outbox.md, 2026-05-24): H5 is the
+      "serious version" of cube anti-signal. Distinct from A1/H2/H3/H4 which
+      all rode the skill axis. H5 abandons KOL/skill identity entirely and
+      conditions on observable trading behavior pattern. Resurrection of
+      cubes as a research line, not a continuation of A1.
+    verdict:
+      result: REJECTED_PRE_RUNNING
+      cycle_verdict: 002
+      kill_criteria_fired: ["§3.6 / B8 axis-stability"]
+      composite_median_rotation_pct: 54.4
+      turnover_fallback_median_rotation_pct: 43.7
+      artifact_links:
+        - research/foundation/_engine/axis_stability_reports/H5_V2_composite_axis.md
+        - research/foundation/_engine/axis_stability_reports/H5_V2_turnover_only_axis.md
+        - research/foundation/_engine/negative_log.md#n2--cycle-002-h5-cube-behavior-axis-blocked-before-running-2026-05-24
+
+  # Canonical catalog promotion target
+  - id: I-B1-cycle002-twin
+    status: QUEUED
+    cycle_first_seen: 002
+    thesis: "可转债套利 — canonical alpha catalog entry I-B1 promoted to cycle 002 in parallel with H5"
+    notes: |
+      Cycle 002 runs H5 (cubes resurrection) AND I-B1 (canonical 可转债) in
+      parallel. Different code paths, different data needs; no contention.
+      Claude owns I-B1 (转债 infrastructure code-heavy: data feed via akshare
+      转债, 公告 scrape, double-low backtest). Codex owns H5.
+    owner: claude
+    canonical_link: canonical_inefficiencies[I-B1]
+
+external_proposals_inbox: |
+  Cycle 002+ should also pull candidates from:
+    - ~/jz_code/research_log/ (Johnny's repo_scout tool)
+    - arxiv / SSRN search via WebSearch (query: "A-share retail sentiment", "Chinese mutual fund herding alpha", "social trading copytrade alpha")
+    - Quantopian / GitHub repo_scout for cubes-adjacent ideas
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Canonical inefficiency catalog — source: ~/jz_code/research_log/inefficiency_hunting.md
+# Higher-priority than the experimental cubes hypotheses (A1/H2-H4) because they have
+# Johnny-graded evidence (✓✓ regulator-level mechanism, ✓ industry/academic consensus).
+# Each is a Phase-2 candidate; verify via foundation framework engine before deploy.
+# ──────────────────────────────────────────────────────────────────────────────
+
+canonical_inefficiencies:
+  - id: I-A1
+    catalog_rank: 🥇 起手必做
+    name: "国债逆回购利率冲高"
+    evidence: ✓✓
+    tier: A_defense_floor
+    expected_yield_range: "2-3%/yr 平均 + 季末/年末 1-2% spike"
+    capacity: "无上限"
+    decay_risk: "几乎不衰减 (CSDC 担保结构)"
+    data_source: "实时利率行情 (券商自带)"
+    bottleneck: "收盘前 5-10 min 自动下单"
+    status: NOT_YET_CYCLED
+    suggested_cycle: 002
+
+  - id: I-A2
+    catalog_rank: 🥉 补充
+    name: "打新 (A股 IPO + 可转债)"
+    evidence: ✓✓ legal, ? yield
+    tier: A_defense_floor
+    expected_yield_range: "A股 3-8%/yr (注册制后衰减), 转债 5-15%/yr"
+    capacity: "A股 个人 1500-3000万市值; 转债 无上限"
+    decay_risk: "A股 已显著衰减; 转债 高峰回落但还活着"
+    status: NOT_YET_CYCLED
+    suggested_cycle: 002
+
+  - id: I-B1
+    catalog_rank: 🥈 主菜首选
+    name: "可转债套利 (强赎/折价/下修/双低)"
+    evidence: ✓✓ for mechanism, ✓ for sub-strategies
+    tier: B_structural_inefficiency
+    expected_yield_range: "2022-2024 精细策略 5-15%/yr"
+    capacity: "个人 500万 内; 千万级有冲击"
+    decay_risk: "公告窗口缩短 (1-3 天 vs 1-2 周), 但机会不消失"
+    data_source: "转债基本信息 + 实时行情 + 公告 (akshare/tushare/集思录)"
+    bottleneck: "公告抓取 → 自动下单速度"
+    known_pitfalls: ["信用违约 (蓝盾/搜特等)", "强赎 2022 新规", "临停/熔断不一致"]
+    status: NOT_YET_CYCLED
+    suggested_cycle: 002
+
+  - id: I-B2
+    catalog_rank: 🥉 进阶
+    name: "ETF 折溢价套利 (商品 ETF + QDII)"
+    evidence: ✓✓ (mechanism), ✓ (yield)
+    tier: B_structural_inefficiency
+    expected_yield_range: "商品ETF 0-3%/yr, QDII 单窗口 1-3%, 2023-2024 多次 10%+"
+    capacity: "境内商品 100-500万; QDII 单只 50-100万触发冲击"
+    decay_risk: "机制持久但窗口越来越短"
+    known_pitfalls: ["溢价可能持续不收敛", "T+1 限制"]
+    status: NOT_YET_CYCLED
+    suggested_cycle: 003
+
+  - id: I-B3
+    catalog_rank: B3 conditional yes
+    name: "Crypto funding rate arbitrage (单交易所 spot+perp basis)"
+    evidence: ✓✓ for mechanism
+    tier: B_structural_inefficiency
+    expected_yield_range: "择时部署 (funding > P50 11%/yr): 13-16%/yr 跨周期; 牛市超额 30%+"
+    capacity: "1000-10000 USDT 起步"
+    decay_risk: "低 (散户参与少)"
+    data_source: "Binance/OKX/Bybit funding rate APIs (已实测)"
+    deploy_status: "监控就位 (~/jz_code/funding_rate_monitor/), 等待 funding > P50"
+    known_pitfalls: ["OTC 入金冻卡", "VPN 稳定性", "交易所跑路"]
+    status: MONITORING
+    notes: "Already past methodology audit per ~/jz_code/research_log/domains/funding_rate/decision.md; conditional deploy ready."
+
+  - id: I-C1
+    catalog_rank: 🥉 if 50 万门槛
+    name: "ETF 期权波动率卖方 (VRP harvesting)"
+    evidence: ✓✓ academic consensus
+    tier: C_risk_premium_harvest
+    expected_yield_range: "长期 5-15%/yr; 单年 -20% 到 +30% (episodic)"
+    capacity: "个人 千万级"
+    decay_risk: "国内 vol 卖方仍有 alpha (不饱和)"
+    data_source: "期权全合约链 + IV 曲面 + 标的 ETF"
+    bottleneck: "Delta 自动对冲 + 严格风控"
+    known_pitfalls: ["尾部风险 (2015/2018/2020 单日吃年收益)", "深度合约买卖价差大"]
+    status: BLOCKED_ON_THRESHOLD
+    notes: "50万 + 期权资格测试 + 6个月经验门槛; long-horizon goal"
+    suggested_cycle: 004_or_later
+
+# Cross-reference notes:
+# 1. A1 (this registry) ≠ I-A1 (Johnny catalog 国债逆回购). Cycle 001's A1 is the
+#    experimental cubes-avoidance signal; canonical A1 is treasury repo.
+# 2. Phase-2 scout commands per inefficiency are documented in inefficiency_hunting.md.
+#    Each entry's repo_scout query is reproducible.
+# 3. The methodology engine VERIFIES; the catalog DEPLOYS. Both run in parallel for
+#    each canonical entry.
+---

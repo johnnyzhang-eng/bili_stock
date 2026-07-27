@@ -1,0 +1,33 @@
+=== A股做多策略真实指标 ===
+
+ann_ret: 0.309695
+ann_vol: 0.189344
+sharpe: 1.635623
+sortino: 2.218395
+calmar: 1.347361
+mdd: -0.229853
+hit_ratio: 0.650602
+go_flat_ratio: 0.231481
+excess: 0.012930
+turnover: 0.830062
+downside_dev: 0.139603
+mdd_duration_periods: 40.000000
+cvar95: -0.085658
+ls_spread_mean: 0.010046
+上涨_top_ret: -0.001018
+震荡_top_ret: 0.021980
+下跌_top_ret: 0.014742
+sell_fly_rate: 0.114739
+attr_allocation: -0.212884
+attr_selection: 0.085448
+attr_timing: 0.000000
+attr_total: -0.127436
+risk_trigger_count: 901.000000
+risk_scale_avg: 0.632407
+
+年化收益: 30.97%
+最大回撤: -23.0%
+Calmar:   1.3474
+Sharpe:   1.636
+胜率:     65.1%
+Go-flat:  23.1%
